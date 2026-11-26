@@ -24,11 +24,11 @@ html,body{margin:0;padding:0}
 body{
   font-family:"Noto Sans SC",-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
   color:var(--ink); min-height:100vh;
-  background:#06090d url("assets/bg.jpg") center 18%/cover no-repeat fixed;
+  background:#06090d url("assets/bg.jpg") right center/auto 100vh no-repeat fixed;
 }
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--dim,1);
-  background:radial-gradient(120% 90% at 50% 0%, rgba(4,10,16,.18), rgba(2,5,9,.62) 75%),
-    linear-gradient(180deg, rgba(3,7,11,.52), rgba(2,5,9,.66) 55%, rgba(2,5,9,.82))}
+  background:radial-gradient(120% 90% at 50% 0%, rgba(4,10,16,.08), rgba(2,5,9,.28) 75%),
+    linear-gradient(180deg, rgba(3,7,11,.22), rgba(2,5,9,.30) 55%, rgba(2,5,9,.42))}
 a{color:var(--blue)}
 .wrap{max-width:1180px;margin:0 auto;padding:12px 14px 28px}
 header.top{
@@ -66,7 +66,7 @@ h1{font-family:"Noto Serif SC",serif;font-size:18px;margin:0;letter-spacing:.08e
   border-color:rgba(191,227,247,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 14px rgba(142,195,234,.45)}
 .btn:active{transform:translateY(0)}
 .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-@media(max-width:560px){.actions{gap:6px}.btn{padding:0 10px}}
+@media(max-width:560px){.actions{gap:6px}.btn{padding:0 10px}body{background-position:center center;background-size:cover}}
 .panel{display:none;margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;
   padding:14px 16px;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
 .panel.open{display:block}
@@ -202,7 +202,7 @@ footer a{color:var(--ink-dim)}
     <div class="frow"><label for="setPing">显示三网延迟与丢包</label><input type="checkbox" id="setPing" checked></div>
     <div class="frow"><label for="setMonthly">显示本月流量</label><input type="checkbox" id="setMonthly" checked></div>
     <div class="frow"><label for="setCardA">卡片透明度</label><input type="range" id="setCardA" min="25" max="65" value="44"><span id="cardAVal">44%</span></div>
-    <div class="frow"><label for="setDim">背景遮罩（越低背景越透）</label><input type="range" id="setDim" min="50" max="100" value="100"><span id="dimVal">100%</span></div>
+    <div class="frow"><label for="setDim">背景遮罩（越低背景越透）</label><input type="range" id="setDim" min="0" max="100" value="45"><span id="dimVal">45%</span></div>
     <div class="frow"><label for="setInterval">刷新间隔</label>
       <select id="setInterval"><option value="5000">5 秒</option><option value="10000">10 秒</option><option value="30000">30 秒</option></select></div>
     <div class="prow" style="margin-top:6px"><button class="btn" id="btnResetSettings" type="button">恢复默认</button></div>
@@ -228,7 +228,7 @@ const API = (meta && meta.content ? meta.content.split(",")[0].trim() : "") || l
 const WS_ORIGIN = API.replace(/^http/, "ws");
 const state = { servers: [], stats: null, sysConfig: null, config: null, detailId: null, hours: 24, history: [],
   q: "", status: "all", region: "", sort: "online",
-  showPing: true, showMonthly: true, cardA: 44, dim: 100, interval: 5000 };
+  showPing: true, showMonthly: true, cardA: 44, dim: 45, interval: 5000 };
 const SET_KEY = "ghostblade-white-settings";
 try{ const saved = JSON.parse(localStorage.getItem(SET_KEY) || "{}"); Object.assign(state, saved); }catch(e){}
 function saveSettings(){ try{ localStorage.setItem(SET_KEY, JSON.stringify({ showPing: state.showPing, showMonthly: state.showMonthly, cardA: state.cardA, dim: state.dim, interval: state.interval })); }catch(e){} }
