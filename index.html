@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apiBase" content="https://cf-server-monitor.xzhou4714.workers.dev">
+<meta name="theme-color" content="#06090d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet">
+<title>服务器监控面板 · 白羽</title>
+<style>
+/* 玻璃胶囊参考：浅蓝灰丝绸底 + 边缘光 — 仪表盘区变亮，文字改深色，卡片是白玻璃 */
+:root{
+  --ink:#16283a; --ink-dim:#466072; --ink-faint:#6d879a;
+  --silver:#2f4b5e; --blue:#2f7fb8; --gem:#3f8fd1; --green:#1f9d63;
+  --red:#d95a4a; --amber:#b97f1e;
+  --cardA:.48; --card:rgba(255,255,255,var(--cardA)); --card-strong:rgba(255,255,255,.62);
+  --line:rgba(255,255,255,.75); --line-soft:rgba(255,255,255,.45);
+  --bar-track:rgba(22,40,58,.14);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Noto Sans SC",-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--ink); min-height:100vh;
+  /* 浅蓝灰丝绸玻璃底，像 JoyTaung 参考图第二张 */
+  background:linear-gradient(135deg,#c3d5e0 0%,#a9c2d4 30%,#8fb0c6 55%,#b6cddd 80%,#cfe0e9 100%);
+  background-attachment:fixed;
+}
+/* 布局参考图：顶部一整条原画横幅，下面是浅蓝灰玻璃仪表盘，横幅底部渐隐进浅色区
+   背景图完整显示、不裁剪：用 <img> + contain，高度随图走、最高 70vh */
+.banner{position:relative;overflow:hidden;background:#06090d}
+.banner-img{width:100%;max-height:70vh;object-fit:contain;display:block;background:#06090d}
+.banner::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--dim,1);
+  background:linear-gradient(180deg, rgba(3,7,11,.10), rgba(3,7,11,.02) 45%, rgba(195,213,224,.75) 88%, #c3d5e0)}
+.banner .banner-title{position:absolute;left:0;right:0;bottom:34px;z-index:1;text-align:center;
+  color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.8)}
+.banner .banner-title h1{font-family:"Noto Serif SC",serif;font-weight:900}
+.banner .banner-title .sub{color:rgba(255,255,255,.85)}
+.banner .banner-title h1{font-size:30px;margin:0;letter-spacing:.1em}
+.banner .banner-title .sub{font-size:12px;color:var(--ink-dim);margin-top:6px;letter-spacing:.22em}
+@media(max-width:560px){.banner{height:220px}.banner .banner-title h1{font-size:24px}}
+a{color:var(--blue)}
+.wrap{max-width:960px;margin:0 auto;padding:18px 14px 40px}
+header.top{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38));
+  border:1px solid rgba(255,255,255,.85);border-radius:18px;
+  padding:14px 16px;backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 30px rgba(31,64,94,.22);
+}
+.feather{width:42px;height:42px;flex:0 0 42px;border:1px solid rgba(255,255,255,.42);
+  border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.05));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 0 0 1px rgba(142,195,234,.14),0 4px 14px rgba(0,0,0,.3)}
+.feather svg{width:24px;height:24px;fill:none;stroke:var(--silver);stroke-width:1.6}
+h1{font-family:"Noto Serif SC",serif;font-size:21px;margin:0;letter-spacing:.1em;font-weight:900}
+.card h2,.chart h3{font-family:"Noto Serif SC",serif}
+.stat b,.net b{font-family:"Noto Sans SC",sans-serif;font-weight:900;letter-spacing:.02em}
+.sub{font-size:12px;color:var(--ink-dim);margin-top:3px;letter-spacing:.12em}
+.top .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-dim);
+  border:1px solid var(--line-soft);border-radius:999px;padding:5px 10px;background:rgba(255,255,255,.04)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.off{background:var(--red);box-shadow:0 0 8px var(--red)}
+/* 参考图风格：玻璃胶囊按钮 + 边缘光线 — 全圆角、亮边、内高光，图标在左、文字在右、同一基线 */
+.btn{height:38px;display:inline-flex;align-items:center;gap:8px;font-size:13px;line-height:1;
+  color:var(--silver);text-decoration:none;border:1px solid rgba(255,255,255,.38);border-radius:999px;
+  padding:0 16px;cursor:pointer;font-family:inherit;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05) 55%,rgba(207,230,245,.06));
+  backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(0,0,0,.18),
+    0 0 0 1px rgba(142,195,234,.14),0 4px 16px rgba(0,0,0,.32)}
+.btn:hover{background:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,.09) 55%,rgba(142,195,234,.12));
+  border-color:rgba(255,255,255,.55);transform:translateY(-1px)}
+.btn svg{width:16px;height:16px;flex:0 0 16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.btn.active{background:linear-gradient(180deg,rgba(63,143,209,.85),rgba(47,127,184,.85));color:#fff;
+  border-color:rgba(191,227,247,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 14px rgba(142,195,234,.45)}
+.btn:active{transform:translateY(0)}
+.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:560px){.actions{gap:6px}.btn{padding:0 10px}}
+.panel{display:none;margin-top:12px;background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38));border:1px solid rgba(255,255,255,.85);border-radius:16px;
+  padding:14px 16px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px rgba(31,64,94,.18)}
+.panel.open{display:block}
+.panel h3{margin:0 0 10px;font-size:13px;color:var(--silver);letter-spacing:.12em}
+.panel input[type="text"],.panel select{height:38px;border-radius:999px;border:1px solid rgba(255,255,255,.38);
+  background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.04));color:var(--ink);padding:0 16px;font-size:13px;font-family:inherit;outline:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 12px rgba(0,0,0,.25)}
+.panel input[type="text"]{flex:1;min-width:140px}
+.panel input[type="text"]::placeholder{color:var(--ink-faint)}
+.panel select option{background:#0b141c}
+.prow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{height:36px;display:inline-flex;align-items:center;padding:0 16px;font-size:13px;line-height:1;
+  color:var(--ink-dim);border:1px solid rgba(255,255,255,.34);border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.04));
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 3px 12px rgba(0,0,0,.28);
+  cursor:pointer;font-family:inherit}
+.chip:hover{color:var(--ink);border-color:rgba(255,255,255,.5)}
+.chip.sel{background:linear-gradient(180deg,rgba(63,143,209,.85),rgba(47,127,184,.85));color:#fff;
+  border-color:rgba(191,227,247,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 14px rgba(142,195,234,.4)}
+.frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line-soft);font-size:13px}
+.frow:first-of-type{border-top:none}
+.frow label{color:var(--ink-dim)}
+.frow input[type="range"]{width:150px;accent-color:var(--gem)}
+.frow input[type="checkbox"]{width:16px;height:16px;accent-color:var(--gem)}
+/* 参考图布局：统计是一整条深色横条，4 项用竖线分隔，不是 3 张独立卡 */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);margin-top:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38));
+  border:1px solid rgba(255,255,255,.85);border-radius:16px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px rgba(31,64,94,.18)}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}.stat b{font-size:20px!important}}
+.stat{padding:14px 12px;text-align:center}
+.stat + .stat{border-left:1px solid var(--line-soft)}
+.stat .k{font-size:12px;color:var(--ink-dim);letter-spacing:.14em}
+.stat b{display:block;font-size:26px;margin:6px 0 2px;font-weight:650;color:#16283a}
+.stat .v{font-size:12px;color:var(--ink-faint)}
+.cards{margin-top:12px;display:grid;gap:12px}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38));border:1px solid rgba(255,255,255,.85);border-radius:18px;padding:16px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 30px rgba(31,64,94,.2);cursor:pointer}
+.card.off{opacity:.75}
+.card h2{margin:0;font-size:19px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px}
+.badge.on{color:#06281a;background:var(--green)}
+.badge.off{color:#3d0d08;background:var(--red)}
+.meta{font-size:12px;color:var(--ink-dim);margin:8px 0 0;line-height:1.7}
+.meta span{margin-right:12px;white-space:nowrap}
+.row{display:flex;justify-content:space-between;align-items:baseline;margin:14px 0 5px;font-size:14px}
+.row .pct{color:var(--silver);font-weight:650}
+.bar{height:7px;border-radius:99px;background:var(--bar-track);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,#6fb7e8,#bfe3f7);box-shadow:0 0 10px rgba(142,195,234,.55)}
+.bar>i.hot{background:linear-gradient(90deg,#e8a06f,#ffb37a)}
+.net{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.net div{border-top:1px solid var(--line-soft);padding-top:10px;text-align:center}
+.net .k{font-size:12px;color:var(--ink-dim)}
+.net b{display:block;font-size:17px;margin-top:4px}
+.net .v{font-size:12px;color:var(--ink-faint)}
+.ping{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.ping span{font-size:12px;border:1px solid var(--line-soft);border-radius:999px;padding:4px 10px;color:var(--ink-dim)}
+.ping b{color:var(--silver);font-weight:600}
+footer{margin-top:22px;text-align:center;font-size:12px;color:var(--ink-faint);line-height:1.9}
+footer a{color:var(--ink-dim)}
+.notice{background:rgba(255,154,138,.12);border:1px solid rgba(255,154,138,.5);color:#ffd2cb;
+  border-radius:12px;padding:10px 12px;font-size:13px;margin-top:12px;display:none}
+.empty{margin-top:12px;text-align:center;color:var(--ink-dim);padding:34px 12px;
+  background:var(--card);border:1px solid var(--line);border-radius:16px}
+.back{margin:12px 0}
+.chart{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38));border:1px solid rgba(255,255,255,.85);border-radius:16px;padding:14px;margin-top:12px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px rgba(31,64,94,.18)}
+.chart h3{margin:0 0 8px;font-size:14px;color:var(--silver);letter-spacing:.08em}
+.chart svg{width:100%;height:110px;display:block}
+.hours{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.hours button{height:36px;display:inline-flex;align-items:center;padding:0 16px;font-size:13px;line-height:1;
+  background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.04));
+  border:1px solid rgba(255,255,255,.34);color:var(--ink-dim);
+  border-radius:999px;cursor:pointer;font-family:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 3px 12px rgba(0,0,0,.28)}
+.hours button.sel{background:linear-gradient(180deg,rgba(63,143,209,.85),rgba(47,127,184,.85));color:#fff;
+  border-color:rgba(191,227,247,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 14px rgba(142,195,234,.4)}
+</style>
+</head>
+<body>
+<div class="banner" aria-hidden="true">
+  <img class="banner-img" src="assets/bg.jpg" alt="">
+  <div class="banner-title">
+    <h1 id="siteTitle">服务器监控面板</h1>
+    <div class="sub">白羽 · GHOST BLADE · 实时监控</div>
+  </div>
+</div>
+<div class="wrap" style="margin-top:-58px;position:relative;z-index:1">
+  <header class="top">
+    <div class="feather" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M20 4c-6 0-11 4-12 10l-2 6 6-2c6-1 10-6 10-12-2 1-4 1-6 0 1-1 2-2 4-2z"/><path d="M7 20c2-4 5-8 9-10"/></svg>
+    </div>
+    <div class="sp"></div>
+    <span class="pill"><span class="dot" id="liveDot"></span><span id="liveText">连接中…</span></span>
+    <nav class="actions" aria-label="功能">
+      <button class="btn" id="btnSearch" type="button" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>搜索</button>
+      <button class="btn" id="btnFilter" type="button" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 5h16M7 12h10M10 19h4"/></svg>筛选</button>
+      <button class="btn" id="btnRefresh" type="button"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 3v5h-5"/></svg>刷新</button>
+      <button class="btn" id="btnSettings" type="button" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12z"/></svg>设置</button>
+      <a class="btn" href="/admin#/admin"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12h6M12 9v6"/></svg>管理后台</a>
+    </nav>
+  </header>
+
+  <section class="panel" id="searchPanel" aria-label="搜索">
+    <h3>搜索服务器</h3>
+    <div class="prow">
+      <input type="text" id="searchInput" placeholder="输入名称、地区或分组…" autocomplete="off">
+      <button class="btn" id="btnClearSearch" type="button">清空</button>
+    </div>
+  </section>
+
+  <section class="panel" id="filterPanel" aria-label="筛选">
+    <h3>筛选</h3>
+    <div class="prow" id="statusChips">
+      <button class="chip sel" data-status="all" type="button">全部</button>
+      <button class="chip" data-status="online" type="button">仅在线</button>
+      <button class="chip" data-status="offline" type="button">仅离线</button>
+    </div>
+    <div class="prow" style="margin-top:10px">
+      <label for="regionSel" style="font-size:13px;color:var(--ink-dim)">地区</label>
+      <select id="regionSel"><option value="">全部地区</option></select>
+      <label for="sortSel" style="font-size:13px;color:var(--ink-dim)">排序</label>
+      <select id="sortSel">
+        <option value="online">在线优先</option>
+        <option value="name">按名称</option>
+        <option value="cpu">CPU 从高到低</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="panel" id="settingsPanel" aria-label="设置">
+    <h3>显示设置（保存在本浏览器）</h3>
+    <div class="frow"><label for="setPing">显示三网延迟与丢包</label><input type="checkbox" id="setPing" checked></div>
+    <div class="frow"><label for="setMonthly">显示本月流量</label><input type="checkbox" id="setMonthly" checked></div>
+    <div class="frow"><label for="setCardA">卡片透明度</label><input type="range" id="setCardA" min="25" max="65" value="44"><span id="cardAVal">44%</span></div>
+    <div class="frow"><label for="setDim">背景遮罩（越低背景越透）</label><input type="range" id="setDim" min="50" max="100" value="100"><span id="dimVal">100%</span></div>
+    <div class="frow"><label for="setInterval">刷新间隔</label>
+      <select id="setInterval"><option value="5000">5 秒</option><option value="10000">10 秒</option><option value="30000">30 秒</option></select></div>
+    <div class="prow" style="margin-top:6px"><button class="btn" id="btnResetSettings" type="button">恢复默认</button></div>
+  </section>
+
+  <div class="notice" id="notice"></div>
+  <div id="view"></div>
+
+  <footer>
+    <div>🪶 白羽主题 · 鬼刀风 · 仅供个人面板使用，原画版权归原作者所有</div>
+    <div><a id="powered" href="https://github.com/huilang-me/CF-Server-Monitor/" target="_blank" rel="noopener">Powered by CF-Server-Monitor</a>
+    <span id="ver"></span></div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* Ghost Blade White — CFSM third-party theme, vanilla, no build step.
+   API: GET /api/config, GET /api/servers (poll 5s), WS /api/ws?subscribe=all,
+   detail: GET /api/server?id=, GET /api/history/all?id=&hours= */
+const meta = document.querySelector('meta[name="apiBase"]');
+const API = (meta && meta.content ? meta.content.split(",")[0].trim() : "") || location.origin;
+const WS_ORIGIN = API.replace(/^http/, "ws");
+const state = { servers: [], stats: null, sysConfig: null, config: null, detailId: null, hours: 24, history: [],
+  q: "", status: "all", region: "", sort: "online",
+  showPing: true, showMonthly: true, cardA: 44, dim: 100, interval: 5000 };
+const SET_KEY = "ghostblade-white-settings";
+try{ const saved = JSON.parse(localStorage.getItem(SET_KEY) || "{}"); Object.assign(state, saved); }catch(e){}
+function saveSettings(){ try{ localStorage.setItem(SET_KEY, JSON.stringify({ showPing: state.showPing, showMonthly: state.showMonthly, cardA: state.cardA, dim: state.dim, interval: state.interval })); }catch(e){} }
+function applySettings(){
+  document.documentElement.style.setProperty("--cardA", (state.cardA/100).toFixed(2));
+  document.documentElement.style.setProperty("--dim", (state.dim/100).toFixed(2));
+  const p=$("#setPing"), m=$("#setMonthly"), c=$("#setCardA"), d=$("#setDim"), iv=$("#setInterval");
+  if(p) p.checked = state.showPing; if(m) m.checked = state.showMonthly;
+  if(c){ c.value = state.cardA; $("#cardAVal").textContent = state.cardA + "%"; }
+  if(d){ d.value = state.dim; $("#dimVal").textContent = state.dim + "%"; }
+  if(iv) iv.value = String(state.interval);
+}
+let pollTimer = null, ws = null, wsRetry = null, lastOk = 0;
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v, d = 1) => (typeof v === "number" && isFinite(v)) ? v.toFixed(d) : "—";
+const pct = (used, total) => (typeof used === "number" && typeof total === "number" && total > 0)
+  ? Math.min(100, Math.max(0, used / total * 100)) : 0;
+function fmtBytes(b){ if(typeof b!=="number"||!isFinite(b)) return "—";
+  if(b>=1e9) return (b/1e9).toFixed(2)+" GB"; if(b>=1e6) return (b/1e6).toFixed(1)+" MB";
+  if(b>=1e3) return (b/1e3).toFixed(1)+" KB"; return b+" B"; }
+function fmtSpeed(b){ return fmtBytes(b)+"/s"; }
+function fmtMB(mb){ if(typeof mb!=="number"||!isFinite(mb)) return "—";
+  return mb>=1024 ? (mb/1024).toFixed(2)+" GB" : mb.toFixed(0)+" MB"; }
+function isOnline(s){ const t = s.last_updated || s.timestamp; return t && (Date.now()-t < 5*60*1000); }
+function uptime(s){ if(!s.boot_time) return "—"; const sec=Math.max(0,(Date.now()-Number(s.boot_time))/1000);
+  const d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600); return d>0 ? d+" 天 "+h+" 小时" : h+" 小时"; }
+function ago(s){ const t=s.last_updated||s.timestamp; if(!t) return "—"; const sec=Math.floor((Date.now()-t)/1000);
+  return sec<60 ? sec+" 秒前" : Math.floor(sec/60)+" 分钟前"; }
+function showError(msg){ const n=$("#notice"); n.style.display="block"; n.textContent="加载失败："+msg+"（将继续重试）"; }
+function clearError(){ const n=$("#notice"); n.style.display="none"; }
+
+async function api(path){
+  const r = await fetch(API + path, { headers: { "Accept": "application/json" } });
+  if(!r.ok) throw new Error(r.status + " " + path);
+  const t = await r.text();
+  try { return JSON.parse(t); } catch(e){ throw new Error("非 JSON 响应：" + path); }
+}
+async function loadConfig(){
+  try{ state.config = await api("/api/config");
+    if(state.config.site_title) { $("#siteTitle").textContent = state.config.site_title; document.title = state.config.site_title + " · 白羽"; }
+    if(state.config.version){ $("#ver").textContent = " · v" + state.config.version;
+      $("#powered").title = "CF-Server-Monitor " + state.config.version; }
+  }catch(e){ /* config is best-effort; servers still render */ }
+}
+function statCards(){
+  const on = state.servers.filter(isOnline).length;
+  const avg = (f) => state.servers.length ? state.servers.reduce((a,s)=>a+(typeof s[f]==="number"?s[f]:0),0)/state.servers.length : 0;
+  const mem = state.servers.length ? state.servers.reduce((a,s)=>a+pct(s.ram_used,s.ram_total),0)/state.servers.length : 0;
+  const flow = state.servers.reduce((a,s)=>a+(typeof s.net_in_speed==="number"?s.net_in_speed:0)+(typeof s.net_out_speed==="number"?s.net_out_speed:0),0);
+  return `<div class="stats">
+    <div class="stat"><div class="k">在线</div><b>${on}/${state.servers.length}</b><div class="v">在线服务器</div></div>
+    <div class="stat"><div class="k">全部节点</div><b>${state.servers.length}</b><div class="v">服务器总数</div></div>
+    <div class="stat"><div class="k">CPU</div><b>${num(avg("cpu"),1)}%</b><div class="v">平均负载</div></div>
+    <div class="stat"><div class="k">实时流量</div><b>${fmtBytes(flow)}/s</b><div class="v">上下行合计</div></div>
+  </div>`;
+}
+function pingChips(s){
+  const names = { ping_ct:"电信", ping_cu:"联通", ping_cm:"移动", ping_bd:"BGP" };
+  const loss = { ping_ct:"loss_ct", ping_cu:"loss_cu", ping_cm:"loss_cm", ping_bd:"loss_bd" };
+  const out = [];
+  for(const [k,label] of Object.entries(names)){
+    const v = s[k]; if(typeof v !== "number") continue;
+    const l = s[loss[k]]; const ls = (typeof l === "number") ? " · 丢包 " + num(l,0) + "%" : "";
+    out.push(`<span>${label} <b>${num(v,0)} ms</b>${esc(ls)}</span>`);
+  }
+  if(!state.showPing) return "";
+  return out.length ? `<div class="ping">${out.join("")}</div>` : "";
+}
+function serverCard(s){
+  const on = isOnline(s);
+  const cpu = pct(s.cpu, 100), ram = pct(s.ram_used, s.ram_total), disk = pct(s.disk_used, s.disk_total);
+  const price = (s.price && s.price !== "" && s.price !== "-1") ? `${esc(s.currency||"¥")}${esc(s.price)} / ${esc(s.billing_cycle||"月")}` : "";
+  const expire = s.expire_date ? `到期 ${esc(s.expire_date)}` : "";
+  const traffic = (s.traffic_limit) ? `流量上限 ${esc(s.traffic_limit)}` : "";
+  const monthly = state.showMonthly && (typeof s.net_rx_monthly==="number"||typeof s.net_tx_monthly==="number")
+    ? `本月 ${fmtBytes(s.net_rx_monthly||0)} ↓ / ${fmtBytes(s.net_tx_monthly||0)} ↑` : "";
+  return `<article class="card${on?"":" off"}" data-id="${esc(s.id)}" tabindex="0" role="link" aria-label="${esc(s.name)} 详情">
+    <h2>🗄️ ${esc(s.name)}
+      <span class="badge ${on?"on":"off"}">${on?"● 在线":"○ 离线"}</span>
+      ${s.region?`<span class="pill">${esc(s.region)}</span>`:""}
+      ${s.server_group&&s.server_group!=="Default"?`<span class="pill">${esc(s.server_group)}</span>`:""}
+    </h2>
+    <p class="meta">
+      ${s.os?`<span>${esc(s.os)}</span>`:""}
+      ${s.cpu_info?`<span>${esc(s.cpu_info)}</span>`:""}
+      ${s.cpu_cores?`<span>${s.cpu_cores} 核</span>`:""}
+      <span>运行 ${uptime(s)}</span><span>${ago(s)}上报</span>
+      ${s.agent_version?`<span>探针 ${esc(s.agent_version)}</span>`:""}
+      ${price?`<span>${price}</span>`:""}${expire?`<span>${expire}</span>`:""}
+      ${traffic?`<span>${traffic}</span>`:""}${monthly?`<span>${monthly}</span>`:""}
+    </p>
+    <div class="row"><span>CPU ${s.load_avg?`· 负载 ${esc(s.load_avg)}`:""}</span><span class="pct">${num(s.cpu,1)}%</span></div>
+    <div class="bar"><i style="width:${cpu}%" class="${cpu>85?"hot":""}"></i></div>
+    <div class="row"><span>内存</span><span class="pct">${fmtMB(s.ram_used)} / ${fmtMB(s.ram_total)} · ${num(ram,1)}%</span></div>
+    <div class="bar"><i style="width:${ram}%" class="${ram>85?"hot":""}"></i></div>
+    <div class="row"><span>硬盘</span><span class="pct">${fmtMB(s.disk_used)} / ${fmtMB(s.disk_total)} · ${num(disk,1)}%</span></div>
+    <div class="bar"><i style="width:${disk}%"></i></div>
+    <div class="net">
+      <div><div class="k">↑ 上行</div><b>${fmtSpeed(s.net_out_speed)}</b><div class="v">总计 ${fmtBytes(s.net_tx)}</div></div>
+      <div><div class="k">↓ 下行</div><b>${fmtSpeed(s.net_in_speed)}</b><div class="v">总计 ${fmtBytes(s.net_rx)}</div></div>
+    </div>
+    ${pingChips(s)}
+    ${(typeof s.processes==="number")?`<p class="meta">进程 ${s.processes} · TCP ${s.tcp_conn??"—"} · UDP ${s.udp_conn??"—"}</p>`:""}
+  </article>`;
+}
+function renderList(){
+  const v = $("#view");
+  if(!state.servers.length){ v.innerHTML = statCards() + `<div class="empty">暂无服务器数据</div>`; return; }
+  const q = state.q.trim().toLowerCase();
+  let list = state.servers.filter(s=>{
+    if(state.status==="online" && !isOnline(s)) return false;
+    if(state.status==="offline" && isOnline(s)) return false;
+    if(state.region && s.region !== state.region) return false;
+    if(q && !((s.name||"")+" "+(s.region||"")+" "+(s.server_group||"")+" "+(s.tags||"")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const sorted = [...list].sort((a,b)=> state.sort==="name" ? String(a.name).localeCompare(String(b.name))
+    : state.sort==="cpu" ? (b.cpu||0)-(a.cpu||0)
+    : (isOnline(b)?1:0)-(isOnline(a)?1:0) || (a.sort_order??0)-(b.sort_order??0));
+  // keep region options in sync
+  const rs = $("#regionSel");
+  if(rs){ const cur = state.region; const regions = [...new Set(state.servers.map(s=>s.region).filter(Boolean))].sort();
+    rs.innerHTML = `<option value="">全部地区</option>` + regions.map(r=>`<option value="${esc(r)}"${r===cur?" selected":""}>${esc(r)}</option>`).join(""); }
+  if(!sorted.length){ v.innerHTML = statCards() + `<div class="empty">没有符合条件的服务器</div>`; return; }
+  v.innerHTML = statCards() + `<div class="cards">${sorted.map(serverCard).join("")}</div>`;
+  v.querySelectorAll(".card").forEach(el=>{
+    const go = ()=> location.hash = "#/server/" + el.dataset.id;
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter") go(); });
+  });
+}
+function lineChart(rows, field, label, color){
+  if(!rows.length) return `<div class="chart"><h3>${esc(label)}</h3><p class="meta">暂无历史数据</p></div>`;
+  const vals = rows.map(r=> typeof r[field]==="number"?r[field]:0);
+  const max = Math.max(...vals, 1), min = Math.min(...vals, 0);
+  const W=600, H=110, P=8;
+  const pts = vals.map((v,i)=>[P+i*(W-2*P)/Math.max(1,vals.length-1), H-P-(v-min)/(max-min||1)*(H-2*P)]);
+  const line = pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  return `<div class="chart"><h3>${esc(label)} · 最高 ${num(max,1)}${field==="cpu"?"%":" MB"}</h3>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <path d="${line} L ${pts[pts.length-1][0].toFixed(1)} ${H-P} L ${P} ${H-P} Z" fill="${color}" opacity="0.14"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="2"/>
+    </svg></div>`;
+}
+async function renderDetail(id){
+  const v = $("#view");
+  v.innerHTML = `<div class="back"><a class="btn" href="#/">← 返回首页</a></div><div class="empty">正在加载详情…</div>`;
+  let s;
+  try{ s = await api("/api/server?id=" + encodeURIComponent(id)); }
+  catch(e){ v.innerHTML = `<div class="back"><a class="btn" href="#/">← 返回首页</a></div><div class="empty">详情加载失败：${esc(e.message)}</div>`; return; }
+  state.detailId = id;
+  // history is best-effort (hours>24 needs login; anonymous gets 401)
+  let rows = [];
+  try{ rows = await api("/api/history/all?id=" + encodeURIComponent(id) + "&hours=" + state.hours); if(!Array.isArray(rows)) rows=[]; }
+  catch(e){ rows = []; }
+  state.history = rows;
+  const on = isOnline(s);
+  v.innerHTML = `<div class="back"><a class="btn" href="#/">← 返回首页</a></div>
+    <div class="card" style="cursor:default">
+      <h2>${esc(s.name)} <span class="badge ${on?"on":"off"}">${on?"● 在线":"○ 离线"}</span></h2>
+      <p class="meta">${s.os?`<span>${esc(s.os)}</span>`:""}${s.kernel_version?`<span>内核 ${esc(s.kernel_version)}</span>`:""}
+      ${s.cpu_info?`<span>${esc(s.cpu_info)}</span>`:""}<span>运行 ${uptime(s)}</span><span>${ago(s)}上报</span></p>
+      <div class="row"><span>CPU</span><span class="pct">${num(s.cpu,1)}%</span></div>
+      <div class="bar"><i style="width:${pct(s.cpu,100)}%"></i></div>
+      <div class="row"><span>内存</span><span class="pct">${fmtMB(s.ram_used)} / ${fmtMB(s.ram_total)}</span></div>
+      <div class="bar"><i style="width:${pct(s.ram_used,s.ram_total)}%"></i></div>
+      <div class="row"><span>硬盘</span><span class="pct">${fmtMB(s.disk_used)} / ${fmtMB(s.disk_total)}</span></div>
+      <div class="bar"><i style="width:${pct(s.disk_used,s.disk_total)}%"></i></div>
+      <div class="net">
+        <div><div class="k">↑ 上行</div><b>${fmtSpeed(s.net_out_speed)}</b><div class="v">总计 ${fmtBytes(s.net_tx)}</div></div>
+        <div><div class="k">↓ 下行</div><b>${fmtSpeed(s.net_in_speed)}</b><div class="v">总计 ${fmtBytes(s.net_rx)}</div></div>
+      </div>
+      ${pingChips(s)}
+      <p class="meta">进程 ${s.processes??"—"} · TCP ${s.tcp_conn??"—"} · UDP ${s.udp_conn??"—"} · 探针 ${esc(s.agent_version||"—")}</p>
+    </div>
+    <div class="hours">${[1,6,24].map(h=>`<button data-h="${h}" class="${h===state.hours?"sel":""}">${h===1?"1 小时":h===6?"6 小时":"24 小时"}</button>`).join("")}
+      <span style="font-size:12px;color:var(--ink-faint);align-self:center">历史曲线（未登录时最长 24 小时）</span></div>
+    <div id="charts">${lineChart(rows,"cpu","CPU %","#8ec3ea")}${lineChart(rows,"ram_used","内存 MB","#bfe3f7")}</div>`;
+  v.querySelectorAll(".hours button").forEach(b=>b.addEventListener("click",()=>{ state.hours=Number(b.dataset.h); renderDetail(id); }));
+}
+function route(){
+  const m = location.hash.match(/^#\/server\/([\w\-.:]+)/);
+  if(m){ stopWS(); renderDetail(m[1]); }
+  else { state.detailId = null; renderList(); startWS(); }
+}
+async function refresh(){
+  try{
+    const d = await api("/api/servers");
+    state.servers = Array.isArray(d.servers) ? d.servers : [];
+    state.stats = d.stats || null; state.sysConfig = d.sysConfig || null;
+    lastOk = Date.now(); clearError();
+    $("#liveText").textContent = "实时 · " + new Date().toLocaleTimeString("zh-CN",{hour12:false});
+    if(!state.detailId) renderList();
+    else { /* detail page keeps its own data; refresh its card numbers on next visit */ }
+  }catch(e){ showError(e.message); }
+}
+/* WebSocket: subscribe=all + {type:"subscribe",scope:"all",ids}; fallback to polling on any failure. */
+function startWS(){
+  if(ws || !state.servers.length) return;
+  let url; try{ url = new URL(WS_ORIGIN + "/api/ws?subscribe=all"); }catch(e){ return; }
+  try{ ws = new WebSocket(url.toString()); }catch(e){ ws = null; return; }
+  ws.onopen = ()=>{ try{ ws.send(JSON.stringify({type:"subscribe", scope:"all", ids: state.servers.map(s=>s.id)})); }catch(e){} };
+  ws.onmessage = (ev)=>{
+    let msg; try{ msg = JSON.parse(ev.data); }catch(e){ return; }
+    if(msg.type !== "batchUpdate" || !Array.isArray(msg.updates)) return;
+    let changed = false;
+    for(const u of msg.updates) for(const smp of (u.samples||[])){
+      const data = smp.data || smp.payload || smp.metrics || {};
+      const s = state.servers.find(x=>x.id===u.serverId); if(!s) continue;
+      Object.assign(s, data); if(smp.ts) s.last_updated = smp.ts; changed = true;
+    }
+    if(changed){ lastOk = Date.now(); $("#liveText").textContent = "实时 · " + new Date().toLocaleTimeString("zh-CN",{hour12:false}); if(!state.detailId) renderList(); }
+  };
+  const dead = ()=>{ if(ws){ try{ws.close();}catch(e){} ws=null; }
+    clearTimeout(wsRetry); wsRetry = setTimeout(()=>{ if(!state.detailId && !document.hidden) startWS(); }, 8000); };
+  ws.onerror = dead; ws.onclose = dead;
+}
+function stopWS(){ if(ws){ try{ws.close();}catch(e){} ws=null; } clearTimeout(wsRetry); }
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) stopWS(); else if(!state.detailId){ refresh(); startWS(); } });
+window.addEventListener("hashchange", route);
+function togglePanel(id, btn){
+  const p = $(id); const open = !p.classList.contains("open");
+  ["#searchPanel","#filterPanel","#settingsPanel"].forEach(s=>$(s).classList.remove("open"));
+  ["#btnSearch","#btnFilter","#btnSettings"].forEach(s=>{ $(s).classList.remove("active"); $(s).setAttribute("aria-expanded","false"); });
+  if(open){ p.classList.add("open"); btn.classList.add("active"); btn.setAttribute("aria-expanded","true"); }
+}
+function wirePanels(){
+  $("#btnSearch").addEventListener("click", e=>{ togglePanel("#searchPanel", e.currentTarget); $("#searchInput").focus(); });
+  $("#btnFilter").addEventListener("click", e=>togglePanel("#filterPanel", e.currentTarget));
+  $("#btnSettings").addEventListener("click", e=>togglePanel("#settingsPanel", e.currentTarget));
+  $("#btnRefresh").addEventListener("click", ()=>{ refresh(); });
+  $("#searchInput").addEventListener("input", e=>{ state.q = e.target.value; if(!state.detailId) renderList(); });
+  $("#btnClearSearch").addEventListener("click", ()=>{ state.q=""; $("#searchInput").value=""; if(!state.detailId) renderList(); });
+  document.querySelectorAll("#statusChips .chip").forEach(c=>c.addEventListener("click", ()=>{
+    state.status = c.dataset.status;
+    document.querySelectorAll("#statusChips .chip").forEach(x=>x.classList.toggle("sel", x===c));
+    if(!state.detailId) renderList();
+  }));
+  $("#regionSel").addEventListener("change", e=>{ state.region = e.target.value; if(!state.detailId) renderList(); });
+  $("#sortSel").addEventListener("change", e=>{ state.sort = e.target.value; if(!state.detailId) renderList(); });
+  $("#setPing").addEventListener("change", e=>{ state.showPing = e.target.checked; saveSettings(); if(!state.detailId) renderList(); });
+  $("#setMonthly").addEventListener("change", e=>{ state.showMonthly = e.target.checked; saveSettings(); if(!state.detailId) renderList(); });
+  $("#setCardA").addEventListener("input", e=>{ state.cardA = Number(e.target.value); $("#cardAVal").textContent = state.cardA+"%"; applySettings(); saveSettings(); });
+  $("#setDim").addEventListener("input", e=>{ state.dim = Number(e.target.value); $("#dimVal").textContent = state.dim+"%"; applySettings(); saveSettings(); });
+  $("#setInterval").addEventListener("change", e=>{ state.interval = Number(e.target.value); saveSettings();
+    clearInterval(pollTimer); pollTimer = setInterval(()=>{ if(!document.hidden) refresh(); }, state.interval); });
+  $("#btnResetSettings").addEventListener("click", ()=>{
+    Object.assign(state, { showPing:true, showMonthly:true, cardA:44, dim:100, interval:5000 });
+    try{ localStorage.removeItem(SET_KEY); }catch(e){}
+    applySettings();
+    document.querySelectorAll("#statusChips .chip").forEach(x=>x.classList.toggle("sel", x.dataset.status==="all"));
+    state.status="all"; state.region=""; state.q=""; $("#searchInput").value="";
+    clearInterval(pollTimer); pollTimer = setInterval(()=>{ if(!document.hidden) refresh(); }, state.interval);
+    if(!state.detailId) renderList();
+  });
+}
+(async function init(){
+  applySettings(); wirePanels();
+  await loadConfig();
+  await refresh();
+  route();
+  pollTimer = setInterval(()=>{ if(!document.hidden) refresh(); }, state.interval);
+})();
+</script>
+</body>
+</html>
